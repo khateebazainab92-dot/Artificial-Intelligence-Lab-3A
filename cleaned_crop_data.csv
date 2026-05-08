@@ -1,0 +1,77 @@
+from flask import Flask, render_template, request
+import pandas as pd
+import joblib
+
+app = Flask(__name__)
+
+# Load Model and Label Encoder
+model = joblib.load('crop_yield_model.pkl')
+le = joblib.load('label_encoder.pkl')
+
+
+@app.route('/')
+def home():
+    return render_template(
+        'index.html',
+        crop_options=le.classes_
+    )
+
+
+@app.route('/predict', methods=['POST'])
+def predict():
+
+    try:
+
+        # Get Inputs
+        crop = request.form['crop']
+
+        rainfall = float(request.form['rainfall'])
+
+        temp = float(request.form['temp'])
+
+        pesticide = float(request.form['pesticide'])
+
+        fertilizer = float(request.form['fertilizer'])
+
+        # Encode Crop
+        crop_encoded = le.transform([crop])[0]
+
+        # Create DataFrame
+        input_data = pd.DataFrame(
+            [[crop_encoded,
+              rainfall,
+              temp,
+              fertilizer,
+              pesticide]],
+
+            columns=[
+                'Crop',
+                'Rainfall_mm',
+                'Temperature',
+                'Fertilizer_used_kg',
+                'Pesticide_used_kg'
+            ]
+        )
+
+        # Prediction
+        prediction = model.predict(input_data)
+
+        result = round(prediction[0], 2)
+
+        return render_template(
+            'index.html',
+            prediction_text=f'Estimated Yield: {result} tons per hectare',
+            crop_options=le.classes_
+        )
+
+    except Exception as e:
+
+        return render_template(
+            'index.html',
+            prediction_text=f'Error: {str(e)}',
+            crop_options=le.classes_
+        )
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
